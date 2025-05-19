@@ -1,0 +1,80 @@
+# Node modules
+node_modules/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory
+coverage/
+
+# Dependency directories
+bower_components/
+
+# Build output
+dist/
+build/
+public/build/
+
+# Cache directories
+.cache/
+.next/
+out/
+.vite/
+.vscode/
+.idea/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Optional npm cache directory
+.npm/
+
+# Optional eslint cache
+.eslintcache
+
+# Test coverage
+coverage/
+
+# Mac system files
+.DS_Store
+
+# Other
+*.tgz
+*.gz
+*.zip
+
+# Ignore logs created by PM2
+pids/
+*.pid
+*.log
+
+# Ignore database files (if applicable)
+*.sqlite
+*.sqlite3
+*.db
+
+# VS Code settings folder
+.vscode/
+
+# Ignore generated static files
+public/static/
