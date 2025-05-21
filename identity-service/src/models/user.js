@@ -24,6 +24,14 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
+    passwordResetToken: {
+      type: String,
+      default: null,
+    },
+    passwordResetExpires: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,
@@ -40,6 +48,17 @@ userSchema.pre("save", async function (next) {
 userSchema.methods.comparePassword = async function (password) {
   return await argon2.verify(this.password, password);
 };
+
+userSchema.methods.generatePasswordResetToken = function () {
+  const resetToken = crypto.randomBytes(20).toString('hex');
+  this.passwordResetToken = crypto
+    .createHash('sha256')
+    .update(resetToken)
+    .digest('hex');
+  this.passwordResetExpires = Date.now() + 10 * 60 * 1000; // 10 min expiry
+  return resetToken;
+};
+
 
 userSchema.index({ username: "text" });
 
