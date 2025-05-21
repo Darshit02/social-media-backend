@@ -1,18 +1,18 @@
 const { logger } = require("../utils/logger");
-const { validateRegistration } = require("../utils/validation");
+const { validateRegistration, validateLogin } = require("../utils/validation");
 const User = require("../models/user");
 const { generateToken } = require("../utils/token-generate");
 const RefreshToken = require("../models/refresh-token");
 const crypto = require("crypto");
 const passwordResetTemplate = require("../template/email");
 const sendEmail = require("../services/mail-service");
+const otpVerificationTemplate = require("../template/otp");
+const { otp, otpExpires, generateOtp } = require("../services/otp-service");
 
 // user registration
-
 const registerUser = async (req, res) => {
   logger.info("user registration request received");
   try {
-    //validate user input
     const { error } = validateRegistration(req.body);
     if (error) {
       logger.warn("Validation error:", error.details[0].message);
@@ -21,39 +21,111 @@ const registerUser = async (req, res) => {
         message: error.details[0].message,
       });
     }
-    //check if user already exists
-    const { username, email, password } = req.body;
 
+    const { username, email, password } = req.body;
     const existingUser = await User.findOne({
       $or: [{ username }, { email }],
     });
     if (existingUser) {
-      logger.warn("User already exists.please try to login");
+      logger.warn("User already exists. Please try to login");
       return res.status(400).json({
         success: false,
-        message: "User already exists.please try to login",
-      });
-    } else {
-      const newUser = new User({
-        username,
-        email,
-        password,
-      });
-      await newUser.save();
-      logger.info("User registered successfully");
-      const { accessToken, refreshToken } = await generateToken(newUser);
-      res.status(201).json({
-        success: true,
-        message: "User registered successfully",
-        data: newUser,
-        tokens: {
-          accessToken,
-          refreshToken,
-        },
+        message: "User already exists. Please try to login",
       });
     }
+    const otp = generateOtp();
+    const otpExpires = new Date(Date.now() + 5 * 60 * 1000); // 5 min expiry
+    await sendEmail({
+      to: email,
+      subject: "Email Verification OTP",
+      html: otpVerificationTemplate(username, otp),
+    });
+
+    const newUser = new User({
+      username,
+      email,
+      password,
+      otp,
+      otpExpires,
+      isVerified: false,
+    });
+
+    await newUser.save();
+
+    logger.info("User registered successfully, please verify OTP.");
+    console.log(newUser);
+
+    res.status(201).json({
+      success: true,
+      message: "User registered successfully. Please verify your email.",
+      data: {
+        userId: newUser._id,
+        email: newUser.email,
+      },
+    });
   } catch (error) {
     logger.error("Error occurred during user registration:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+};
+
+//verify OTP
+const verifyOtp = async (req, res) => {
+  logger.info("OTP verification request received");
+  const { otp, email } = req.body;
+  if (!otp || !email) {
+    logger.warn("OTP and email are required");
+    return res.status(400).json({
+      success: false,
+      message: "OTP and email are required",
+    });
+  }
+  try {
+    const user = await User.findOne({
+      email,
+    });
+    if (!user) {
+      logger.warn("User not found");
+      res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+    if (user.otp !== otp) {
+      logger.warn("Invalid OTP,please try again");
+      return res.status(400).json({
+        success: false,
+        message: "Invalid OTP",
+      });
+    }
+    if (user.otpExpires < new Date()) {
+      logger.warn("OTP expired, please request a new one");
+      return res.status(400).json({
+        success: false,
+        message: "OTP expired, please request a new one",
+      });
+    }
+    user.isVerified = true;
+    user.otp = null;
+    user.otpExpires = null;
+    await user.save();
+    logger.info("OTP verified successfully");
+    const { accessToken, refreshToken } = await generateToken(user);
+    res.status(200).json({
+      success: true,
+      message: "OTP verified successfully",
+      data: user,
+      tokens: {
+        accessToken,
+        refreshToken,
+      },
+    });
+  } catch (error) {
+    logger.error("Error occurred during OTP verification:", error);
     res.status(500).json({
       success: false,
       message: "Internal Server Error",
@@ -317,6 +389,8 @@ const resetPasswordConfirm = async (req, res) => {
   }
 };
 
+//2FA authentication
+
 module.exports = {
   registerUser,
   loginUser,
@@ -324,4 +398,5 @@ module.exports = {
   logoutUser,
   sendEmailForResetPassword,
   resetPasswordConfirm,
+  verifyOtp,
 };
