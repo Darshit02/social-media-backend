@@ -32,6 +32,18 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    otp: {
+      type: String,
+      default: null,
+    },
+    otpExpires: {
+      type: Date,
+      default: null,
+    },
+    isVerified: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,
@@ -50,15 +62,14 @@ userSchema.methods.comparePassword = async function (password) {
 };
 
 userSchema.methods.generatePasswordResetToken = function () {
-  const resetToken = crypto.randomBytes(20).toString('hex');
+  const resetToken = crypto.randomBytes(20).toString("hex");
   this.passwordResetToken = crypto
-    .createHash('sha256')
+    .createHash("sha256")
     .update(resetToken)
-    .digest('hex');
+    .digest("hex");
   this.passwordResetExpires = Date.now() + 10 * 60 * 1000; // 10 min expiry
   return resetToken;
 };
-
 
 userSchema.index({ username: "text" });
 
