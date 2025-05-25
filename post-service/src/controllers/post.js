@@ -1,5 +1,6 @@
 const { logger } = require("../utils/logger");
 const { validateCreatePost } = require("../utils/validation");
+const Post = require("../models/post");
 
 const createPost = async (req, res) => {
   logger.info("Creating a new post request received");
@@ -12,7 +13,7 @@ const createPost = async (req, res) => {
         message: error.details[0].message,
       });
     }
-    const { mediaIds } = req.body;
+    const { mediaIds, content } = req.body;
     const newPost = new Post({
       user: req.user.userId || req.user._id,
       content,
