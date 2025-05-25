@@ -10,6 +10,7 @@ const errorHandler = require("./middleware/error-handler");
 const { rateLimit } = require("express-rate-limit");
 const { RedisStore } = require("rate-limit-redis");
 const { logger } = require("./utils/logger");
+const validateToken = require("./middleware/auth-middleware");
 
 const redisClient = new Redis(process.env.REDIS_URL);
 
@@ -71,12 +72,38 @@ app.use(
   })
 );
 
-app.use(errorHandler)
+// Proxying requests to the Identity Service
+app.use(
+  "/v1/posts",
+  validateToken,
+  proxy(process.env.POST_SERVICE_URL, {
+    ...proxyOptions,
+    proxyReqOptDecorator: (proxyReqOpts, srcReq) => {
+      proxyReqOpts.headers["Content-Type"] = "application/json";
+      proxyReqOpts.headers["x-user-id"] = srcReq.user.userId || srcReq.user._id;
+      logger.info(
+        `Forwarding request to Post service with user ID: ${srcReq.user.userId || srcReq.user._id}`
+      );
 
+      return proxyReqOpts;
+    },
+    userResDecorator: (proxyRes, proxyResData, userReq, userRes) => {
+      logger.info(
+        `Response received from Post service: ${proxyRes.statusCode}`
+      );
 
-app.listen(PORT,() => {
+      return proxyResData;
+    },
+  })
+);
+
+app.use(errorHandler);
+
+app.listen(PORT, () => {
   logger.info(`API Gateway is running on port ${PORT}`);
-  logger.info(`Proxying requests to Identity Service at ${process.env.IDENTITY_SERVICE_URL}`);
+  logger.info(
+    `Proxying requests to Identity Service at ${process.env.IDENTITY_SERVICE_URL}`
+  );
   logger.info(`Redis connection established at ${process.env.REDIS_URL}`);
   logger.info(`Rate limiting is enabled`);
-})
+});
