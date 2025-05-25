@@ -7,7 +7,7 @@ const crypto = require("crypto");
 const passwordResetTemplate = require("../template/email");
 const sendEmail = require("../services/mail-service");
 const otpVerificationTemplate = require("../template/otp");
-const { otp, otpExpires, generateOtp } = require("../services/otp-service");
+const { generateOtp } = require("../services/otp-service");
 
 // user registration
 const registerUser = async (req, res) => {
@@ -305,14 +305,19 @@ const sendEmailForResetPassword = async (req, res) => {
       });
     }
 
-    const resetToken = user.passwordResetToken();
+    const resetToken = user.createPasswordResetToken();
     await user.save();
+
     const resetURL = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
-    const emailContent = passwordResetTemplate(user.name, resetURL);
-    // Send reset email
+    const emailContent = passwordResetTemplate(user.username, resetURL);
+
+    console.log("Sending to:", user.email);
+
+    // Send reset email (await this!)
     await sendEmail(user.email, "Password Reset Request", emailContent);
 
     logger.info(`Password reset email sent to ${email}`);
+
     res.status(200).json({
       success: true,
       message: "Password reset link sent to your email",
@@ -326,6 +331,7 @@ const sendEmailForResetPassword = async (req, res) => {
     });
   }
 };
+
 
 const resetPasswordConfirm = async (req, res) => {
   logger.info("Password reset confirmation received");

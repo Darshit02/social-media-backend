@@ -5,6 +5,8 @@ const redis = require("ioredis");
 const cors = require("cors");
 const helmet = require("helmet");
 const postRoutes = require("./routes/post");
+const likesRoutes = require("./routes/likes");
+const comment = require("./routes/comment");
 const errorHandler = require("./middleware/error-handler");
 const ratelimiter = require("rate-limiter-flexible");
 const rateLimit = require("express-rate-limit");
@@ -74,7 +76,9 @@ app.use(
     req.redisClient = redisClient;
     next();
   },
-  postRoutes
+  postRoutes,
+  likesRoutes,
+  comment
 );
 
 app.use((req, res, next) => {
