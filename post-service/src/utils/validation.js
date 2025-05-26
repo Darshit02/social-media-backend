@@ -3,6 +3,7 @@ const joi = require("joi");
 const validateCreatePost = (data) => {
   const schema = joi.object({
     content: joi.string().required(),
+    mediaIds : joi.array()
   });
   return schema.validate(data);
 };
