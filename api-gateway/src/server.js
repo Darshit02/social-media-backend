@@ -72,7 +72,7 @@ app.use(
   })
 );
 
-// Proxying requests to the Identity Service
+// Proxying requests to the Post Service
 app.use(
   "/v1/posts",
   validateToken,
@@ -82,7 +82,9 @@ app.use(
       proxyReqOpts.headers["Content-Type"] = "application/json";
       proxyReqOpts.headers["x-user-id"] = srcReq.user.userId || srcReq.user._id;
       logger.info(
-        `Forwarding request to Post service with user ID: ${srcReq.user.userId || srcReq.user._id}`
+        `Forwarding request to Post service with user ID: ${
+          srcReq.user.userId || srcReq.user._id
+        }`
       );
 
       return proxyReqOpts;
@@ -97,6 +99,31 @@ app.use(
   })
 );
 
+//setting up proxy for our media service
+app.use(
+  "/v1/media",
+  validateToken,
+  proxy(process.env.MEDIA_SERVICE_URL, {
+    ...proxyOptions,
+    proxyReqOptDecorator: (proxyReqOpts, srcReq) => {
+      proxyReqOpts.headers["x-user-id"] = srcReq.user.userId;
+      if (!srcReq.headers["content-type"].startsWith("multipart/form-data")) {
+        proxyReqOpts.headers["Content-Type"] = "application/json";
+      }
+
+      return proxyReqOpts;
+    },
+    userResDecorator: (proxyRes, proxyResData, userReq, userRes) => {
+      logger.info(
+        `Response received from media service: ${proxyRes.statusCode}`
+      );
+
+      return proxyResData;
+    },
+    parseReqBody: false,
+  })
+);
+
 app.use(errorHandler);
 
 app.listen(PORT, () => {
@@ -106,4 +133,6 @@ app.listen(PORT, () => {
   );
   logger.info(`Redis connection established at ${process.env.REDIS_URL}`);
   logger.info(`Rate limiting is enabled`);
+  logger.info(`Proxying requests to Post Service at ${process.env.POST_SERVICE_URL}`);
+  logger.info(`Proxying requests to Media Service at ${process.env.MEDIA_SERVICE_URL}`);
 });
