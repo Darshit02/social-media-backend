@@ -15,6 +15,8 @@ const { RedisStore } = require("rate-limit-redis");
 const { connectToDb } = require("./database/db");
 const { logger } = require("./utils/logger");
 const { configureCors } = require("./config/cors");
+const { connectToRabbitMQ, consumeEvent } = require("./utils/rabbitmq");
+const { handlePostDeleted } = require("./handler/media-handlers");
 
 connectToDb();
 const redisClient = new redis(process.env.REDIS_URL);
@@ -70,9 +72,20 @@ app.use("/api/media", sensitiveRatelimiter, mediaRoutes);
 
 app.use(errorHandler);
 
-app.listen(PORT, () => {
-  logger.info(`Server is running on port ${PORT}`);
-});
+async function startServer() {
+  try {
+    await connectToRabbitMQ();
+    await consumeEvent("post.deleted", handlePostDeleted);
+    app.listen(PORT, () => {
+      logger.info(`Server is running on port ${PORT}`);
+    });
+    logger.info("RabbitMQ connection established successfully");
+  } catch (error) {
+    logger.error("Error RabbitMQ connection:", error);
+  }
+}
+
+startServer();
 
 //unhandled promise rejections
 process.on("unhandledRejection", (reason, promise) => {
