@@ -42,6 +42,26 @@ const uploadMedia = async (req, res) => {
   }
 };
 
+const getAllMedia = async (req, res) => {
+  logger.info("Fetching all media...");
+  try {
+    const userId = req.user.userId;
+    const mediaList = await Media.find({ userId }).sort({ createdAt: -1 });
+    logger.info(`Found ${mediaList.length} media items for user ${userId}`);
+    return res.status(200).json({
+      status: true,
+      media: mediaList,
+      message: "Media fetched successfully",
+    });
+  } catch (error) {
+    logger.error("Error fetching media:", error);
+    return res
+      .status(500)
+      .json({ status: false, error: "Error fetching media" });
+  }
+};
+
 module.exports = {
   uploadMedia,
+  getAllMedia,
 };
