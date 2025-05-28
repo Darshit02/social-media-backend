@@ -1,7 +1,7 @@
 const { logger } = require("../utils/logger");
 const { validateCreatePost } = require("../utils/validation");
 const Post = require("../models/post");
-const { publishMessage } = require("../utils/rabbitmq");
+const { publishEvent } = require("../utils/rabbitmq");
 
 async function invalidatePostCache(req, input) {
   const keys = await req.redisClient.keys("posts:*");
@@ -36,6 +36,15 @@ const createPost = async (req, res) => {
     });
 
     await newPost.save();
+    await publishEvent("post.created", {
+      postId : newPost._id.toString(),
+      userId: newPost.user.toString(),
+      content: newPost.content,
+      createdAt: newPost.createdAt,
+    })
+
+    
+
     await invalidatePostCache(req, newPost._id.toString());
     logger.info("Post created successfully");
     res.status(201).json({
@@ -79,6 +88,7 @@ const getAllPosts = async (req, res) => {
       posts,
     };
 
+     
     await req.redisClient.set(cacheKey, JSON.stringify(result), "EX", 300);
     logger.info("Posts fetched from database");
     res.status(200).json({
@@ -125,12 +135,6 @@ const getPostById = async (req, res) => {
       });
     }
 
-    await publishMessage("post.deleted" , {
-      postId : post._id.toString(),
-      userId: post.user.toString(),
-      mediaIds: post.mediaIds,
-      action: "delete",
-    })
     logger.info("Post fetched successfully");
     res.status(200).json({
       success: true,
@@ -148,44 +152,39 @@ const getPostById = async (req, res) => {
 };
 
 const deletePost = async (req, res) => {
-  logger.info("Deleting post request received");
   try {
-    const postId = req.params.id;
-    const cacheKey = `posts:${postId}`;
-    const cachedPosts = await req.redisClient.get(cacheKey);
-    if (cachedPosts) {
-      logger.info("Returning cached posts");
-      return res.json(JSON.parse(cachedPosts));
-    }
-    if (!postId) {
-      logger.error("post ID is required");
-      return res.status(400).json({
-        success: false,
-        message: "Post ID is required",
-      });
-    }
-    const deletePost = await Post.findByIdAndDelete(postId);
-    if (!deletePost) {
-      logger.warn("Post was not found");
+    const post = await Post.findOneAndDelete({
+      _id: req.params.id,
+      user: req.user.userId,
+    });
+
+    if (!post) {
       return res.status(404).json({
-        success: false,
         message: "Post not found",
+        success: false,
       });
     }
-    await req.redisClient.del(cacheKey);
-    logger.info("Post deleted successfully");
-    res.status(200).json({
-      success: true,
+
+    //publish post delete method ->
+    await publishEvent("post.deleted", {
+      postId: post._id.toString(),
+      userId: req.user.userId,
+      mediaIds: post.mediaIds,
+    });
+
+    await invalidatePostCache(req, req.params.id);
+    res.json({
       message: "Post deleted successfully",
     });
   } catch (error) {
-    logger.error("Error deleting post: ", error);
+    logger.error("Error deleting post", error);
     res.status(500).json({
       success: false,
-      message: "Internal server error",
+      message: "Error deleting post",
     });
   }
 };
+
 
 module.exports = {
   createPost,

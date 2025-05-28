@@ -21,7 +21,7 @@ async function connectToRabbitMQ() {
   }
 }
 
-async function publishMessage(routingKey, message) {
+async function publishEvent(routingKey, message) {
   if(!channel) {
     await connectToRabbitMQ();
 
@@ -32,5 +32,5 @@ async function publishMessage(routingKey, message) {
 
 module.exports = {
   connectToRabbitMQ,
-  publishMessage,
+  publishEvent,
 };
